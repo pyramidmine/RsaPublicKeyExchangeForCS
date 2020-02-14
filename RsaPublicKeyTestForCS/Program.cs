@@ -71,11 +71,41 @@ namespace RsaPublicKeyTestForCS
 			byte[] decryptedData = Decrypt(encryptedData, privateKeyData);
 
 			//
-			// 결과
+			// 결과 (암/복호화)
 			//
-			Console.WriteLine($"---------- RSA, Key: C#, Endec: C# ----------");
+			Console.WriteLine($"---------- RSA, Key: C#, Apply: C# ----------");
 			Console.WriteLine($"Original Data: {Convert.ToBase64String(SAMPLE_DATA)}");
 			Console.WriteLine($"Original Data: {Convert.ToBase64String(decryptedData)}");
+
+			//
+			// Signing
+			//
+			Console.WriteLine($"---------- RSA Signing/Verification, Key: C#, Apply: C# ----------");
+			var hasher = HashAlgorithm.Create("SHA384");
+			byte[] signature = CreatePrivateRSA(privateKeyData).SignData(SAMPLE_DATA, hasher);
+			Console.WriteLine($"Signature Size: {signature.Length}");
+
+			//
+			// Verification
+			//
+			bool verified = CreatePublicRSA(publicKeyData).VerifyData(SAMPLE_DATA, hasher, signature);
+
+			//
+			// 결과 (Signing/Verification)
+			//
+			Console.WriteLine($"Original Data Verification: {verified}");
+
+			// 데이터를 살짝 변경
+			byte[] fakeSampleData = new byte[SAMPLE_DATA.Length];
+			Array.Copy(SAMPLE_DATA, 0, fakeSampleData, 0, fakeSampleData.Length);
+			fakeSampleData[5] += 1;
+
+			//
+			// Verification one more time
+			// 
+			verified = CreatePublicRSA(publicKeyData).VerifyData(fakeSampleData, hasher, signature);
+			Console.WriteLine($"---------- RSA Signing/Verification, Key: C#, Apply: C# ----------");
+			Console.WriteLine($"Fake Data Verification: {verified}");
 
 			// 자바에서 만든 암호화 파일이 있으면 테스트
 			/*
@@ -97,20 +127,30 @@ namespace RsaPublicKeyTestForCS
 
 		private static byte[] Encrypt(byte[] data, byte[] publicKeyData)
 		{
-			var bcPublicKeyParam = PublicKeyFactory.CreateKey(publicKeyData) as RsaKeyParameters;
-			var rsaPublicKeyParam = DotNetUtilities.ToRSAParameters(bcPublicKeyParam);
-			var encryptor = new RSACryptoServiceProvider();
-			encryptor.ImportParameters(rsaPublicKeyParam);
-			return encryptor.Encrypt(data, false);
+			return CreatePublicRSA(publicKeyData).Encrypt(data, false);
 		}
 
 		private static byte[] Decrypt(byte[] data, byte[] privateKeyData)
 		{
+			return CreatePrivateRSA(privateKeyData).Decrypt(data, false);
+		}
+
+		private static RSACryptoServiceProvider CreatePublicRSA(byte[] publicKeyData)
+		{
+			var bcPublicKeyParam = PublicKeyFactory.CreateKey(publicKeyData) as RsaKeyParameters;
+			var rsaPublicKeyParam = DotNetUtilities.ToRSAParameters(bcPublicKeyParam);
+			var rsa = new RSACryptoServiceProvider();
+			rsa.ImportParameters(rsaPublicKeyParam);
+			return rsa;
+		}
+
+		private static RSACryptoServiceProvider CreatePrivateRSA(byte[] privateKeyData)
+		{
 			var bcPrivateKeyParam = PrivateKeyFactory.CreateKey(privateKeyData) as RsaPrivateCrtKeyParameters;
 			var rsaPrivateKeyParam = DotNetUtilities.ToRSAParameters(bcPrivateKeyParam);
-			var decryptor = new RSACryptoServiceProvider();
-			decryptor.ImportParameters(rsaPrivateKeyParam);
-			return decryptor.Decrypt(data, false);
+			var rsa = new RSACryptoServiceProvider();
+			rsa.ImportParameters(rsaPrivateKeyParam);
+			return rsa;
 		}
 
 		private static string GetKeyDirectory()
